@@ -1,4 +1,7 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 
 void main() {
   runApp(const MyApp());
@@ -16,6 +19,46 @@ class Task {
     required this.description,
     this.isCompleted = false,
   });
+
+  factory Task.fromJson(Map<String, dynamic> json) {
+    return Task(
+      id: json['id'] as int,
+      title: json['title'] as String,
+      description: json['description'] as String,
+      isCompleted: json['isCompleted'] as bool,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'title': title,
+      'description': description,
+      'isCompleted': isCompleted,
+    };
+  }
+}
+
+class TaskManager {
+  static const String storageKey = 'tasks';
+
+  Future<List<Task>> loadTasks() async {
+    final prefs = await SharedPreferences.getInstance();
+    final taskJson = prefs.getString(storageKey);
+    if (taskJson != null) {
+      final taskList = json.decode(taskJson) as List<dynamic>;
+      return taskList.map((taskMap) => Task.fromJson(taskMap)).toList();
+    } else {
+      return [];
+    }
+  }
+
+  Future<void> saveTasks(List<Task> tasks) async {
+    final prefs = await SharedPreferences.getInstance();
+    final taskList = tasks.map((task) => task.toJson()).toList();
+    final taskJson = json.encode(taskList);
+    await prefs.setString(storageKey, taskJson);
+  }
 }
 
 class MyApp extends StatelessWidget {
@@ -37,12 +80,27 @@ class MyHomePage extends StatefulWidget {
   final String title;
 
   const MyHomePage({Key? key, required this.title}) : super(key: key);
-
   @override
   State<MyHomePage> createState() => _MyHomePageState();
 }
 
 class _MyHomePageState extends State<MyHomePage> {
+  final TaskManager taskManager = TaskManager();
+  List<Task> tasks = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTasks();
+  }
+
+  Future<void> _loadTasks() async {
+    final loadedTasks = await taskManager.loadTasks();
+    setState(() {
+      tasks = loadedTasks;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -53,7 +111,9 @@ class _MyHomePageState extends State<MyHomePage> {
         onPressed: () {
           Navigator.push(
             context,
-            MaterialPageRoute(builder: (context) => const ToDoList()),
+            MaterialPageRoute(
+                builder: (context) =>
+                    ToDoList(tasks: tasks, taskManager: taskManager)),
           );
         },
         child: const Icon(Icons.add),
@@ -63,16 +123,27 @@ class _MyHomePageState extends State<MyHomePage> {
 }
 
 class ToDoList extends StatelessWidget {
-  const ToDoList({Key? key}) : super(key: key);
+  final List<Task> tasks;
+  final TaskManager taskManager;
+
+  const ToDoList({Key? key, required this.tasks, required this.taskManager})
+      : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Nouvelle Liste'),
-      ),
-      body: const AddTaskForm(),
-    );
+        appBar: AppBar(
+          title: const Text('Nouvelle Liste'),
+        ),
+        body: const AddTaskForm(),
+        floatingActionButton: FloatingActionButton(
+          onPressed: () async {
+            await taskManager.saveTasks(tasks);
+            // ignore: use_build_context_synchronously
+            Navigator.pop(context);
+          },
+          child: const Icon(Icons.save),
+        ));
   }
 }
 
