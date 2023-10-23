@@ -5,11 +5,13 @@ void main() {
 }
 
 class Task {
+  final int id;
   final String title;
   final String description;
   bool isCompleted;
 
   Task({
+    required this.id,
     required this.title,
     required this.description,
     this.isCompleted = false,
@@ -85,6 +87,7 @@ class AddTaskForm extends StatefulWidget {
 class _AddTaskFormState extends State<AddTaskForm> {
   final TextEditingController titleController = TextEditingController();
   final TextEditingController descriptionController = TextEditingController();
+  int taskId = 0;
   final List<Task> tasks = [];
 
   void addTask() {
@@ -93,9 +96,10 @@ class _AddTaskFormState extends State<AddTaskForm> {
 
     if (title.isNotEmpty && description.isNotEmpty) {
       setState(() {
-        tasks.add(Task(title: title, description: description));
+        tasks.add(Task(id: taskId, title: title, description: description));
         titleController.clear();
         descriptionController.clear();
+        taskId++;
       });
     }
   }
@@ -145,21 +149,36 @@ class ListItems extends StatefulWidget {
 }
 
 class _ListItemsState extends State<ListItems> {
+  void deleteTask(int taskId) {
+    setState(() {
+      widget.tasks.removeWhere((task) => task.id == taskId);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Expanded(
       child: ListView.builder(
         itemCount: widget.tasks.length,
         itemBuilder: (BuildContext context, int index) {
-          return CheckboxListTile(
-            value: widget.tasks[index].isCompleted,
-            onChanged: (bool? value) {
-              setState(() {
-                widget.tasks[index].isCompleted = value ?? false;
-              });
-            },
-            title: Text(widget.tasks[index].title),
-            subtitle: Text(widget.tasks[index].description),
+          final task = widget.tasks[index];
+          return ListTile(
+            leading: Checkbox(
+              value: task.isCompleted,
+              onChanged: (bool? value) {
+                setState(() {
+                  task.isCompleted = value ?? false;
+                });
+              },
+            ),
+            title: Text(task.title),
+            subtitle: Text(task.description),
+            trailing: IconButton(
+              icon: const Icon(Icons.delete),
+              onPressed: () {
+                deleteTask(task.id);
+              },
+            ),
           );
         },
       ),
